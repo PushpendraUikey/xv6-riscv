@@ -31,12 +31,15 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  // file system operation begin: safe to use (acquires lock)
   begin_op();
 
+  // read the elf binary from the path.: translate path into an inode pointer
   if((ip = namei(path)) == 0){
     end_op();
     return -1;
   }
+  // lock the inode
   ilock(ip);
 
   // Check ELF header
@@ -46,6 +49,7 @@ exec(char *path, char **argv)
   if(elf.magic != ELF_MAGIC)
     goto bad;
 
+    // new pagetable for new memory image
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
 
@@ -97,7 +101,7 @@ exec(char *path, char **argv)
       goto bad;
     if(copyout(pagetable, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
       goto bad;
-    ustack[argc] = sp;
+    ustack[argc] = sp;  // pointers to the mem addresses stored
   }
   ustack[argc] = 0;
 
@@ -115,6 +119,7 @@ exec(char *path, char **argv)
   p->trapframe->a1 = sp;
 
   // Save program name for debugging.
+  // Exract the program name from full path by finding the last '/' and then copy to p->name.
   for(last=s=path; *s; s++)
     if(*s == '/')
       last = s+1;
